@@ -1,3 +1,5 @@
+.DS_Store
+
 # Dolt database (managed by Dolt, not git)
 dolt/
 dolt-access.lock

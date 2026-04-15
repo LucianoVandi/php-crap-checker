@@ -1,0 +1,55 @@
+{
+    "name": "lvandi/php-crap-checker",
+    "description": "A CLI tool to fail CI when PHP CRAP score exceeds a configured threshold.",
+    "type": "library",
+    "license": "MIT",
+    "bin": [
+        "bin/crap-check"
+    ],
+    "require": {
+        "php": ">=8.3",
+        "ext-simplexml": "*",
+        "symfony/console": "^7.0"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.0",
+        "infection/infection": "^0.29",
+        "phpmd/phpmd": "^2.0",
+        "phpstan/phpstan": "^2.0",
+        "phpunit/phpunit": "^11.0 || ^12.0",
+        "rector/rector": "^2.0"
+    },
+    "suggest": {
+        "ext-pcov": "Useful for generating PHPUnit coverage reports with PCOV.",
+        "ext-xdebug": "Alternative coverage driver for PHPUnit."
+    },
+    "autoload": {
+        "psr-4": {
+            "Lvandi\\PhpCrapChecker\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Lvandi\\PhpCrapChecker\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "stan": "phpstan analyse src tests",
+        "cs-check": "php-cs-fixer fix --dry-run --diff",
+        "cs-fix": "php-cs-fixer fix",
+        "phpmd": "phpmd src/ text .phpmd.xml",
+        "rector": "rector process --dry-run",
+        "infection": "infection",
+        "qa": [
+            "@test",
+            "@stan"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "infection/extension-installer": true
+        }
+    }
+}

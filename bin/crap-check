@@ -1,0 +1,15 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Lvandi\PhpCrapChecker\Command\CheckCommand;
+use Symfony\Component\Console\Application;
+
+require $_composer_autoload_path ?? __DIR__ . '/../vendor/autoload.php';
+
+$application = new Application('PHP CRAP Checker', '0.1.0');
+$application->add(new CheckCommand());
+$application->setDefaultCommand('check', true);
+
+exit($application->run());

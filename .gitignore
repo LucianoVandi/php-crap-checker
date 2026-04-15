@@ -1,5 +1,10 @@
+.idea
+.DS_Store
+/vendor/
+/build/
 
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
 .beads-credential-key
+*.cache

@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "php_crap_checker",
+  "project_id": "1269c958-57ea-4de6-8f1f-9103b9363a12"
+}

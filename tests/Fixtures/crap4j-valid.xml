@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<crap_result>
+    <project/>
+    <timestamp>2026-04-24T10:00:00</timestamp>
+    <methods>
+        <method>
+            <className>Lvandi\PhpCrapChecker\Analyzer\CrapAnalyzer</className>
+            <methodName>findViolations</methodName>
+            <crap>3.0</crap>
+            <complexity>3</complexity>
+            <coverage>100.0</coverage>
+        </method>
+        <method>
+            <className>Lvandi\PhpCrapChecker\Parser\Crap4jParser</className>
+            <methodName>parse</methodName>
+            <crap>6.0</crap>
+            <complexity>4</complexity>
+            <coverage>95.0</coverage>
+        </method>
+        <method>
+            <className>Lvandi\PhpCrapChecker\Command\CheckCommand</className>
+            <methodName>execute</methodName>
+            <crap>12.0</crap>
+            <complexity>6</complexity>
+            <coverage>88.5</coverage>
+        </method>
+    </methods>
+</crap_result>

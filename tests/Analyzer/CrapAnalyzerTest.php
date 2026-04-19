@@ -1,0 +1,100 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Lvandi\PhpCrapChecker\Tests\Analyzer;
+
+use Lvandi\PhpCrapChecker\Analyzer\CrapAnalyzer;
+use Lvandi\PhpCrapChecker\Result\Violation;
+use Lvandi\PhpCrapChecker\ValueObject\MethodMetric;
+use PHPUnit\Framework\TestCase;
+
+final class CrapAnalyzerTest extends TestCase
+{
+    private CrapAnalyzer $analyzer;
+
+    protected function setUp(): void
+    {
+        $this->analyzer = new CrapAnalyzer();
+    }
+
+    public function testExactlyAtThresholdIsNotAViolation(): void
+    {
+        $methods = [new MethodMetric('foo', 30.0)];
+
+        $violations = $this->analyzer->findViolations($methods, 30.0);
+
+        self::assertSame([], $violations);
+    }
+
+    public function testJustAboveThresholdIsAViolation(): void
+    {
+        $method = new MethodMetric('foo', 30.01);
+
+        $violations = $this->analyzer->findViolations([$method], 30.0);
+
+        self::assertCount(1, $violations);
+        self::assertInstanceOf(Violation::class, $violations[0]);
+        self::assertSame($method, $violations[0]->method);
+        self::assertSame(30.0, $violations[0]->threshold);
+    }
+
+    public function testEmptyMethodListReturnsNoViolations(): void
+    {
+        $violations = $this->analyzer->findViolations([], 30.0);
+
+        self::assertSame([], $violations);
+    }
+
+    public function testMethodsBelowThresholdAreIgnored(): void
+    {
+        $methods = [
+            new MethodMetric('a', 10.0),
+            new MethodMetric('b', 29.99),
+        ];
+
+        $violations = $this->analyzer->findViolations($methods, 30.0);
+
+        self::assertSame([], $violations);
+    }
+
+    public function testViolationsAreSortedByCrapDescThenComplexityDescThenNameAsc(): void
+    {
+        $methods = [
+            new MethodMetric('zebra', 50.0, complexity: 5),
+            new MethodMetric('alpha', 50.0, complexity: 5),
+            new MethodMetric('middle', 50.0, complexity: 8),
+            new MethodMetric('high', 72.0, complexity: 10),
+            new MethodMetric('low', 31.0, complexity: 3),
+        ];
+
+        $violations = $this->analyzer->findViolations($methods, 30.0);
+
+        self::assertCount(5, $violations);
+
+        $names = array_map(fn(Violation $v) => $v->method->name, $violations);
+        self::assertSame(['high', 'middle', 'alpha', 'zebra', 'low'], $names);
+    }
+
+    public function testSortingWithNullComplexityTreatedAsZero(): void
+    {
+        $methods = [
+            new MethodMetric('withComplexity', 50.0, complexity: 3),
+            new MethodMetric('noComplexity', 50.0, complexity: null),
+        ];
+
+        $violations = $this->analyzer->findViolations($methods, 30.0);
+
+        $names = array_map(fn(Violation $v) => $v->method->name, $violations);
+        self::assertSame(['withComplexity', 'noComplexity'], $names);
+    }
+
+    public function testViolationCarriesCorrectThreshold(): void
+    {
+        $methods = [new MethodMetric('foo', 100.0)];
+
+        $violations = $this->analyzer->findViolations($methods, 42.5);
+
+        self::assertSame(42.5, $violations[0]->threshold);
+    }
+}

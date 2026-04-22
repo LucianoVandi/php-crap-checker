@@ -12,7 +12,8 @@ final readonly class CheckResult
     public function __construct(
         public array $violations,
         public int $totalMethods,
-    ) {}
+    ) {
+    }
 
     public function hasViolations(): bool
     {

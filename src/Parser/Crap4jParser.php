@@ -39,45 +39,35 @@ final class Crap4jParser
     {
         $methods = [];
 
-        foreach ($xml->project->package ?? [] as $package) {
-            $className = (string) $package['name'];
+        foreach ($xml->methods->method ?? [] as $method) {
+            $metric = $this->buildMetric($method);
 
-            foreach ($package->class ?? [] as $class) {
-                $className = (string) $class['name'];
-
-                foreach ($class->method ?? [] as $method) {
-                    $metric = $this->buildMetric($method, $className);
-
-                    if ($metric !== null) {
-                        $methods[] = $metric;
-                    }
-                }
+            if ($metric instanceof MethodMetric) {
+                $methods[] = $metric;
             }
         }
 
         return $methods;
     }
 
-    private function buildMetric(\SimpleXMLElement $method, string $className): ?MethodMetric
+    private function buildMetric(\SimpleXMLElement $method): ?MethodMetric
     {
-        $name = (string) $method['name'];
+        $name = (string) $method->methodName;
 
-        if ((string) $method->crap === '') {
+        if ($name === '' || (string) $method->crap === '') {
             return null;
         }
 
-        $crap = (float) $method->crap;
-        $file = (string) $method->relative_path !== '' ? (string) $method->relative_path : null;
-        $line = (string) $method->start_line !== '' ? (int) $method->start_line : null;
+        $className = (string) $method->className;
         $complexity = (string) $method->complexity !== '' ? (int) $method->complexity : null;
-        $coverage = (string) $method->covered_percent !== '' ? (float) $method->covered_percent : null;
+        $coverage = (string) $method->coverage !== '' ? (float) $method->coverage : null;
 
         return new MethodMetric(
             name: $name,
-            crap: $crap,
+            crap: (float) $method->crap,
             className: $className !== '' ? $className : null,
-            file: $file,
-            line: $line,
+            file: null,
+            line: null,
             complexity: $complexity,
             coverage: $coverage,
         );

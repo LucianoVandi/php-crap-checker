@@ -11,5 +11,6 @@ final readonly class Violation
     public function __construct(
         public MethodMetric $method,
         public float $threshold,
-    ) {}
+    ) {
+    }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lvandi\PhpCrapChecker\Command;
 
+use LogicException;
 use Lvandi\PhpCrapChecker\Analyzer\CrapAnalyzer;
 use Lvandi\PhpCrapChecker\Console\ExitCode;
 use Lvandi\PhpCrapChecker\Exception\InvalidReportException;
@@ -28,10 +29,18 @@ final class CheckCommand extends Command
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text)', 'text');
     }
 
+    /**
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $reportPath = (string) $input->getArgument('report');
-        $thresholdRaw = (string) $input->getOption('threshold');
+        $reportPath = $input->getArgument('report');
+        $thresholdRaw = $input->getOption('threshold');
+
+        if (!is_string($reportPath) || !is_string($thresholdRaw)) {
+            throw new LogicException('report and threshold must be strings');
+        }
 
         if (!is_numeric($thresholdRaw)) {
             $output->writeln(sprintf('<error>Invalid threshold "%s": must be a number.</error>', $thresholdRaw));
@@ -105,6 +114,6 @@ final class CheckCommand extends Command
 
     private function formatNumber(float $value): string
     {
-        return $value == (float)(int) $value ? (string)(int) $value : (string) $value;
+        return $value === (float)(int) $value ? (string)(int) $value : (string) $value;
     }
 }

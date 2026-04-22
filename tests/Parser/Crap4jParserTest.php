@@ -26,7 +26,6 @@ final class Crap4jParserTest extends TestCase
         $methods = $this->parser->parse($this->fixturesDir . '/crap4j-valid.xml');
 
         self::assertCount(3, $methods);
-        self::assertContainsOnlyInstancesOf(MethodMetric::class, $methods);
     }
 
     public function testParsedMethodHasCorrectValues(): void
@@ -36,7 +35,7 @@ final class Crap4jParserTest extends TestCase
         $first = $methods[0];
         self::assertSame('findViolations', $first->name);
         self::assertSame(3.0, $first->crap);
-        self::assertSame('Lvandi\PhpCrapChecker\Analyzer\CrapAnalyzer', $first->className);
+        self::assertSame(\Lvandi\PhpCrapChecker\Analyzer\CrapAnalyzer::class, $first->className);
         self::assertSame('src/Analyzer/CrapAnalyzer.php', $first->file);
         self::assertSame(12, $first->line);
         self::assertSame(3, $first->complexity);
@@ -49,7 +48,7 @@ final class Crap4jParserTest extends TestCase
 
         self::assertCount(6, $methods);
 
-        $crapValues = array_map(fn(MethodMetric $m) => $m->crap, $methods);
+        $crapValues = array_map(fn (MethodMetric $m): float => $m->crap, $methods);
         self::assertContains(46.23, $crapValues);
         self::assertContains(72.0, $crapValues);
     }

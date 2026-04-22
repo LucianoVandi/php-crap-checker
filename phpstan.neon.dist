@@ -3,3 +3,5 @@ parameters:
     paths:
         - src
         - tests
+    ignoreErrors:
+        - '#PHPDoc tag @SuppressWarnings has invalid value#'

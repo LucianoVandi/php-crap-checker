@@ -14,5 +14,6 @@ final readonly class MethodMetric
         public ?int $line = null,
         public ?int $complexity = null,
         public ?float $coverage = null,
-    ) {}
+    ) {
+    }
 }

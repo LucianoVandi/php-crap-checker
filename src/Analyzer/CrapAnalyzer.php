@@ -23,19 +23,19 @@ final class CrapAnalyzer
             }
         }
 
-        usort($violations, static function (Violation $a, Violation $b): int {
-            if ($a->method->crap !== $b->method->crap) {
-                return $b->method->crap <=> $a->method->crap;
+        usort($violations, static function (Violation $left, Violation $right): int {
+            if ($left->method->crap !== $right->method->crap) {
+                return $right->method->crap <=> $left->method->crap;
             }
 
-            $complexityA = $a->method->complexity ?? 0;
-            $complexityB = $b->method->complexity ?? 0;
+            $complexityLeft = $left->method->complexity ?? 0;
+            $complexityRight = $right->method->complexity ?? 0;
 
-            if ($complexityA !== $complexityB) {
-                return $complexityB <=> $complexityA;
+            if ($complexityLeft !== $complexityRight) {
+                return $complexityRight <=> $complexityLeft;
             }
 
-            return $a->method->name <=> $b->method->name;
+            return $left->method->name <=> $right->method->name;
         });
 
         return $violations;

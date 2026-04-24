@@ -36,8 +36,8 @@ final class Crap4jParserTest extends TestCase
         self::assertSame('findViolations', $first->name);
         self::assertSame(3.0, $first->crap);
         self::assertSame(\Lvandi\PhpCrapChecker\Analyzer\CrapAnalyzer::class, $first->className);
-        self::assertSame('src/Analyzer/CrapAnalyzer.php', $first->file);
-        self::assertSame(12, $first->line);
+        self::assertNull($first->file);
+        self::assertNull($first->line);
         self::assertSame(3, $first->complexity);
         self::assertEqualsWithDelta(100.0, $first->coverage, 0.01);
     }
@@ -68,6 +68,25 @@ final class Crap4jParserTest extends TestCase
         $this->parser->parse('/non/existent/file.xml');
     }
 
+    public function testUnreadableFileThrowsReportNotFoundException(): void
+    {
+        if (posix_getuid() === 0) {
+            $this->markTestSkipped('Cannot test unreadable files as root');
+        }
+
+        $tmpFile = sys_get_temp_dir() . '/unreadable-crap4j-' . uniqid() . '.xml';
+        file_put_contents($tmpFile, '<crap_result/>');
+        chmod($tmpFile, 0o000);
+
+        try {
+            $this->expectException(ReportNotFoundException::class);
+            $this->parser->parse($tmpFile);
+        } finally {
+            chmod($tmpFile, 0o644);
+            @unlink($tmpFile);
+        }
+    }
+
     public function testMalformedXmlThrowsInvalidReportException(): void
     {
         $malformedFile = sys_get_temp_dir() . '/malformed-crap4j-' . uniqid() . '.xml';
@@ -81,28 +100,67 @@ final class Crap4jParserTest extends TestCase
         }
     }
 
+    public function testLibxmlErrorStateIsRestoredAfterMalformedXml(): void
+    {
+        $malformedFile = sys_get_temp_dir() . '/malformed-crap4j-' . uniqid() . '.xml';
+        file_put_contents($malformedFile, '<?xml version="1.0"?><unclosed>');
+
+        $stateBefore = libxml_use_internal_errors(false);
+
+        try {
+            $this->parser->parse($malformedFile);
+        } catch (\Throwable) {
+            // expected
+        } finally {
+            @unlink($malformedFile);
+        }
+
+        self::assertFalse(libxml_use_internal_errors($stateBefore));
+    }
+
+    public function testLibxmlErrorStateIsRestoredAfterValidParse(): void
+    {
+        $stateBefore = libxml_use_internal_errors(false);
+
+        $this->parser->parse($this->fixturesDir . '/crap4j-valid.xml');
+
+        self::assertFalse(libxml_use_internal_errors($stateBefore));
+    }
+
+    public function testLibxmlErrorsAreNotLeakedBetweenCalls(): void
+    {
+        $malformedFile = sys_get_temp_dir() . '/malformed-crap4j-' . uniqid() . '.xml';
+        file_put_contents($malformedFile, '<?xml version="1.0"?><unclosed>');
+
+        try {
+            $this->parser->parse($malformedFile);
+        } catch (\Throwable) {
+        } finally {
+            @unlink($malformedFile);
+        }
+
+        $methods = $this->parser->parse($this->fixturesDir . '/crap4j-valid.xml');
+        self::assertCount(3, $methods);
+    }
+
     public function testMethodWithoutCrapValueIsSkipped(): void
     {
         $xmlWithMissingCrap = <<<'XML'
             <?xml version="1.0" encoding="UTF-8"?>
             <crap_result>
-                <project name="test">
-                    <package name="App">
-                        <class name="App\Foo">
-                            <method name="bar">
-                                <relative_path>src/Foo.php</relative_path>
-                                <start_line>1</start_line>
-                                <complexity>2</complexity>
-                            </method>
-                            <method name="baz">
-                                <relative_path>src/Foo.php</relative_path>
-                                <start_line>10</start_line>
-                                <crap>5.0</crap>
-                                <complexity>2</complexity>
-                            </method>
-                        </class>
-                    </package>
-                </project>
+                <methods>
+                    <method>
+                        <className>App\Foo</className>
+                        <methodName>bar</methodName>
+                        <complexity>2</complexity>
+                    </method>
+                    <method>
+                        <className>App\Foo</className>
+                        <methodName>baz</methodName>
+                        <crap>5.0</crap>
+                        <complexity>2</complexity>
+                    </method>
+                </methods>
             </crap_result>
             XML;
 
@@ -123,15 +181,13 @@ final class Crap4jParserTest extends TestCase
         $xmlMinimal = <<<'XML'
             <?xml version="1.0" encoding="UTF-8"?>
             <crap_result>
-                <project name="test">
-                    <package name="App">
-                        <class name="App\Minimal">
-                            <method name="run">
-                                <crap>10.0</crap>
-                            </method>
-                        </class>
-                    </package>
-                </project>
+                <methods>
+                    <method>
+                        <className>App\Minimal</className>
+                        <methodName>run</methodName>
+                        <crap>10.0</crap>
+                    </method>
+                </methods>
             </crap_result>
             XML;
 

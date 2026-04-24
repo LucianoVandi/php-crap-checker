@@ -89,6 +89,48 @@ final class CrapAnalyzerTest extends TestCase
         self::assertSame(['withComplexity', 'noComplexity'], $names);
     }
 
+    public function testNullComplexityOnLeftSideOrderedAfterPositiveComplexity(): void
+    {
+        // Ensures ?? 0 on $complexityLeft is correct: null < positive → comes after
+        $methods = [
+            new MethodMetric('nullFirst', 50.0, complexity: null),
+            new MethodMetric('hasComplexity', 50.0, complexity: 1),
+        ];
+
+        $violations = $this->analyzer->findViolations($methods, 30.0);
+
+        $names = array_map(fn (Violation $v): string => $v->method->name, $violations);
+        self::assertSame(['hasComplexity', 'nullFirst'], $names);
+    }
+
+    public function testBothNullComplexityFallsThroughToNameOrdering(): void
+    {
+        // Ensures ?? 0 on both sides: equal complexity → sort by name asc
+        $methods = [
+            new MethodMetric('zebra', 50.0, complexity: null),
+            new MethodMetric('alpha', 50.0, complexity: null),
+        ];
+
+        $violations = $this->analyzer->findViolations($methods, 30.0);
+
+        $names = array_map(fn (Violation $v): string => $v->method->name, $violations);
+        self::assertSame(['alpha', 'zebra'], $names);
+    }
+
+    public function testNullComplexityEqualsZeroComplexityFallsThroughToName(): void
+    {
+        // null ?? 0 and explicit 0 are equal → sort by name
+        $methods = [
+            new MethodMetric('zebra', 50.0, complexity: 0),
+            new MethodMetric('alpha', 50.0, complexity: null),
+        ];
+
+        $violations = $this->analyzer->findViolations($methods, 30.0);
+
+        $names = array_map(fn (Violation $v): string => $v->method->name, $violations);
+        self::assertSame(['alpha', 'zebra'], $names);
+    }
+
     public function testViolationCarriesCorrectThreshold(): void
     {
         $methods = [new MethodMetric('foo', 100.0)];

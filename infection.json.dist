@@ -1,0 +1,25 @@
+{
+    "$schema": "vendor/infection/infection/resources/schema.json",
+    "source": {
+        "directories": [
+            "src/Analyzer",
+            "src/Parser"
+        ]
+    },
+    "logs": {
+        "text": "build/infection.log",
+        "summary": "build/infection-summary.log"
+    },
+    "mutators": {
+        "@default": true,
+        "FalseValue": {
+            "ignore": [
+                "Lvandi\\PhpCrapChecker\\Parser\\Crap4jParser::parse"
+            ]
+        }
+    },
+    "minMsi": 80,
+    "minCoveredMsi": 90,
+    "testFramework": "phpunit",
+    "testFrameworkOptions": "--testsuite=unit"
+}

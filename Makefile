@@ -1,7 +1,7 @@
 PHP      = docker compose run --rm php
 COMPOSER = docker compose run --rm composer
 
-.PHONY: build install test coverage stan cs-check cs-fix phpmd rector infection check-fixture qa
+.PHONY: build install test coverage crap stan cs-check cs-fix phpmd rector infection check-fixture qa
 
 build:
 	HOST_UID=$(shell id -u) HOST_GID=$(shell id -g) docker compose build
@@ -14,6 +14,9 @@ test:
 
 coverage:
 	$(PHP) php -d pcov.enabled=1 vendor/bin/phpunit --coverage-crap4j build/crap4j.xml
+
+crap: coverage
+	$(PHP) php bin/crap-check build/crap4j.xml --threshold=30
 
 stan:
 	$(PHP) vendor/bin/phpstan analyse src tests
@@ -34,6 +37,6 @@ infection:
 	$(PHP) vendor/bin/infection
 
 check-fixture:
-	$(PHP) php bin/crap-check check tests/Fixtures/crap4j-with-violations.xml --threshold=30
+	$(PHP) php bin/crap-check tests/Fixtures/crap4j-with-violations.xml --threshold=30
 
 qa: test stan

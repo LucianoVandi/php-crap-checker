@@ -27,45 +27,25 @@ final class DoctorCommand extends Command
             ->setDescription('Diagnose environment and PHPUnit configuration');
     }
 
+    /** @SuppressWarnings(PHPMD.UnusedFormalParameter) */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $output->writeln('PHP CRAP Checker — Doctor');
         $output->writeln('');
 
         $extensions = $this->loadedExtensions !== null
-            ? array_map('strtolower', $this->loadedExtensions)
-            : array_map('strtolower', get_loaded_extensions());
-        $hasFail = false;
+            ? array_map(strtolower(...), $this->loadedExtensions)
+            : array_map(strtolower(...), get_loaded_extensions());
 
         $output->writeln('PHP Runtime');
         $output->writeln(sprintf('  <info>[OK]</info>   PHP %s', PHP_VERSION));
         $output->writeln('');
 
         $output->writeln('Extensions');
-
-        if (in_array('simplexml', $extensions, true)) {
-            $output->writeln('  <info>[OK]</info>   ext-simplexml loaded');
-        } else {
-            $output->writeln('  <error>[FAIL]</error> ext-simplexml not found');
-            $output->writeln('     → Enable ext-simplexml in your php.ini');
-            $hasFail = true;
-        }
-
-        $hasPcov = in_array('pcov', $extensions, true);
-        $hasXdebug = in_array('xdebug', $extensions, true);
-
-        if ($hasPcov || $hasXdebug) {
-            $driver = $hasPcov ? 'PCOV' : 'Xdebug';
-            $output->writeln(sprintf('  <info>[OK]</info>   Coverage driver found: %s', $driver));
-        } else {
-            $output->writeln('  <comment>[WARN]</comment> No coverage driver (PCOV or Xdebug) detected');
-            $output->writeln('     → Install PCOV: composer require --dev pcov/clobber');
-        }
-
+        $hasFail = $this->checkExtensions($extensions, $output);
         $output->writeln('');
 
         $cwd = $this->workingDir !== '' ? $this->workingDir : (string) getcwd();
-
         $output->writeln('PHPUnit Configuration');
 
         $configPath = $this->findPhpunitConfig($cwd);
@@ -74,18 +54,55 @@ final class DoctorCommand extends Command
             $output->writeln('  <comment>[WARN]</comment> phpunit.xml or phpunit.xml.dist not found');
             $output->writeln(sprintf('     → Expected in: %s', $cwd));
             $output->writeln('');
-
             return $hasFail ? ExitCode::ThresholdExceeded->value : ExitCode::Success->value;
         }
 
         $output->writeln(sprintf('  <info>[OK]</info>   %s found', basename($configPath)));
 
-        $xml = @simplexml_load_file($configPath);
+        return $this->checkPhpunitXml($configPath, $hasFail, $output);
+    }
+
+    /**
+     * @param list<string> $extensions
+     */
+    private function checkExtensions(array $extensions, OutputInterface $output): bool
+    {
+        $hasFail = false;
+
+        $hasSimpleXml = in_array('simplexml', $extensions, true);
+        $output->writeln($hasSimpleXml
+            ? '  <info>[OK]</info>   ext-simplexml loaded'
+            : '  <error>[FAIL]</error> ext-simplexml not found');
+
+        if (!$hasSimpleXml) {
+            $output->writeln('     → Enable ext-simplexml in your php.ini');
+            $hasFail = true;
+        }
+
+        $hasPcov = in_array('pcov', $extensions, true);
+        $hasXdebug = in_array('xdebug', $extensions, true);
+
+        if (!$hasPcov && !$hasXdebug) {
+            $output->writeln('  <comment>[WARN]</comment> No coverage driver (PCOV or Xdebug) detected');
+            $output->writeln('     → Install PCOV: composer require --dev pcov/clobber');
+            return $hasFail;
+        }
+
+        $driver = $hasPcov ? 'PCOV' : 'Xdebug';
+        $output->writeln(sprintf('  <info>[OK]</info>   Coverage driver found: %s', $driver));
+
+        return $hasFail;
+    }
+
+    private function checkPhpunitXml(string $configPath, bool $hasFail, OutputInterface $output): int
+    {
+        libxml_use_internal_errors(true);
+        $xml = simplexml_load_file($configPath);
+        libxml_clear_errors();
 
         if ($xml === false) {
             $output->writeln(sprintf('  <error>[FAIL]</error> Failed to parse %s', basename($configPath)));
             $output->writeln('');
-
             return ExitCode::ThresholdExceeded->value;
         }
 
@@ -95,28 +112,27 @@ final class DoctorCommand extends Command
             $output->writeln('  <comment>[WARN]</comment> Crap4J report not configured');
             $output->writeln('    => Add <crap4j outputFile="build/crap4j.xml"/> inside <coverage><report>');
             $output->writeln('');
-
             return $hasFail ? ExitCode::ThresholdExceeded->value : ExitCode::Success->value;
         }
 
         $output->writeln(sprintf('  <info>[OK]</info>   Crap4J report configured: %s', $crap4jPath));
         $output->writeln('');
-
         $output->writeln('Report Path');
 
         $defaultReport = 'build/crap4j.xml';
 
         if ($crap4jPath === $defaultReport) {
             $output->writeln(sprintf('  <info>[OK]</info>   Default report path matches PHPUnit config (%s)', $defaultReport));
-        } else {
-            $output->writeln(sprintf(
-                '  <comment>[WARN]</comment> PHPUnit writes to "%s" but checker default is "%s"',
-                $crap4jPath,
-                $defaultReport,
-            ));
-            $output->writeln(sprintf('     → Run: crap-check check %s', $crap4jPath));
+            $output->writeln('');
+            return $hasFail ? ExitCode::ThresholdExceeded->value : ExitCode::Success->value;
         }
 
+        $output->writeln(sprintf(
+            '  <comment>[WARN]</comment> PHPUnit writes to "%s" but checker default is "%s"',
+            $crap4jPath,
+            $defaultReport,
+        ));
+        $output->writeln(sprintf('     → Run: crap-check check %s', $crap4jPath));
         $output->writeln('');
 
         return $hasFail ? ExitCode::ThresholdExceeded->value : ExitCode::Success->value;

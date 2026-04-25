@@ -18,6 +18,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/** @SuppressWarnings(PHPMD.ExcessiveClassComplexity) */
 final class CheckCommand extends Command
 {
     /** @param (\Closure(): int)|null $clock */
@@ -126,11 +127,24 @@ final class CheckCommand extends Command
             return $this->resolveExitCode($violations, $maxViolations);
         }
 
+        return $this->renderTextOutput($output, $violations, $threshold, $maxViolations, count($methods));
+    }
+
+    /**
+     * @param list<Violation> $violations
+     */
+    private function renderTextOutput(
+        OutputInterface $output,
+        array $violations,
+        float $threshold,
+        ?int $maxViolations,
+        int $totalMethods,
+    ): int {
         $thresholdLabel = $this->formatNumber($threshold);
 
         if ($violations === []) {
             $output->writeln(sprintf('CRAP threshold OK. Max allowed: %s', $thresholdLabel));
-            $output->writeln(sprintf('Analyzed methods: %d', count($methods)));
+            $output->writeln(sprintf('Analyzed methods: %d', $totalMethods));
             $output->writeln('Violations: 0');
             return ExitCode::Success->value;
         }
@@ -139,13 +153,8 @@ final class CheckCommand extends Command
         $output->writeln('');
 
         $count = count($violations);
-
-        if ($maxViolations !== null) {
-            $output->writeln(sprintf('%d violation%s found (limit: %d):', $count, $count === 1 ? '' : 's', $maxViolations));
-        } else {
-            $output->writeln(sprintf('%d violation%s found:', $count, $count === 1 ? '' : 's'));
-        }
-
+        $limit = $maxViolations !== null ? sprintf(' (limit: %d)', $maxViolations) : '';
+        $output->writeln(sprintf('%d violation%s found%s:', $count, $count === 1 ? '' : 's', $limit));
         $output->writeln('');
 
         foreach ($violations as $i => $violation) {
@@ -183,7 +192,7 @@ final class CheckCommand extends Command
             return null;
         }
 
-        $now = $this->clock !== null ? ($this->clock)() : time();
+        $now = $this->clock instanceof \Closure ? ($this->clock)() : time();
         $ageSeconds = $now - $mtime;
 
         if ($ageSeconds > $maxAgeSeconds) {
@@ -251,7 +260,7 @@ final class CheckCommand extends Command
             'threshold' => $threshold,
             'analyzed' => $totalMethods,
             'violations' => count($violations),
-            'methods' => array_map(fn (Violation $v): array => $this->violationToArray($v), $violations),
+            'methods' => array_map($this->violationToArray(...), $violations),
         ];
 
         return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR);

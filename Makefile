@@ -20,7 +20,7 @@ coverage: ## Generate Crap4J coverage report
 	$(PHP) php -d pcov.enabled=1 vendor/bin/phpunit --coverage-crap4j build/crap4j.xml
 
 crap: coverage ## Run crap-check on the generated coverage report
-	$(PHP) php bin/crap-check check build/crap4j.xml --threshold=30
+	$(PHP) php bin/crap-check check build/crap4j.xml --threshold=20
 
 stan: ## Run PHPStan static analysis (level 9)
 	$(PHP) vendor/bin/phpstan analyse src tests --memory-limit=256M

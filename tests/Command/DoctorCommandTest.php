@@ -16,7 +16,7 @@ final class DoctorCommandTest extends TestCase
     protected function setUp(): void
     {
         $this->tempDir = sys_get_temp_dir() . '/crap-doctor-' . uniqid();
-        mkdir($this->tempDir, 0755, true);
+        mkdir($this->tempDir, 0o755, true);
     }
 
     protected function tearDown(): void

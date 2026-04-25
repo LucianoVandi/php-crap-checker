@@ -291,7 +291,7 @@ final class CheckCommandTest extends TestCase
         $file = $this->fixturesDir . '/crap4j-valid.xml';
         touch($file, $now - 300); // 5 minutes old
 
-        $tester = $this->makeTesterWithClock(fn() => $now);
+        $tester = $this->makeTesterWithClock(fn (): int => $now);
         $tester->execute([
             'report' => $file,
             '--max-age' => '60',
@@ -306,7 +306,7 @@ final class CheckCommandTest extends TestCase
         $file = $this->fixturesDir . '/crap4j-valid.xml';
         touch($file, $now - 5400); // 90 minutes old
 
-        $tester = $this->makeTesterWithClock(fn() => $now);
+        $tester = $this->makeTesterWithClock(fn (): int => $now);
         $tester->execute([
             'report' => $file,
             '--max-age' => '60',
@@ -321,7 +321,7 @@ final class CheckCommandTest extends TestCase
         $file = $this->fixturesDir . '/crap4j-valid.xml';
         touch($file, $now - 5400); // 90 minutes old
 
-        $tester = $this->makeTesterWithClock(fn() => $now);
+        $tester = $this->makeTesterWithClock(fn (): int => $now);
         $tester->execute([
             'report' => $file,
             '--max-age' => '60',
@@ -338,7 +338,7 @@ final class CheckCommandTest extends TestCase
         $file = $this->fixturesDir . '/crap4j-valid.xml';
         touch($file, $now - 300); // 5 minutes old
 
-        $tester = $this->makeTesterWithClock(fn() => $now);
+        $tester = $this->makeTesterWithClock(fn (): int => $now);
         $tester->execute([
             'report' => $file,
             '--max-age' => '1h', // 60 minutes
@@ -353,7 +353,7 @@ final class CheckCommandTest extends TestCase
         $file = $this->fixturesDir . '/crap4j-valid.xml';
         touch($file, $now - 5400); // 90 minutes old
 
-        $tester = $this->makeTesterWithClock(fn() => $now);
+        $tester = $this->makeTesterWithClock(fn (): int => $now);
         $tester->execute([
             'report' => $file,
             '--max-age' => '30m',

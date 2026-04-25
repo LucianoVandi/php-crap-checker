@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lvandi\PhpCrapChecker\Command;
 
+use JsonException;
 use LogicException;
 use Lvandi\PhpCrapChecker\Analyzer\CrapAnalyzer;
 use Lvandi\PhpCrapChecker\Console\ExitCode;
@@ -26,7 +27,7 @@ final class CheckCommand extends Command
             ->setDescription('Check CRAP score against a threshold')
             ->addArgument('report', InputArgument::OPTIONAL, 'Path to Crap4J XML report', 'build/crap4j.xml')
             ->addOption('threshold', null, InputOption::VALUE_REQUIRED, 'Maximum allowed CRAP score', '30')
-            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text)', 'text');
+            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text|json)', 'text');
     }
 
     /**
@@ -37,13 +38,19 @@ final class CheckCommand extends Command
     {
         $reportPath = $input->getArgument('report');
         $thresholdRaw = $input->getOption('threshold');
+        $format = $input->getOption('format');
 
-        if (!is_string($reportPath) || !is_string($thresholdRaw)) {
-            throw new LogicException('report and threshold must be strings');
+        if (!is_string($reportPath) || !is_string($thresholdRaw) || !is_string($format)) {
+            throw new LogicException('report, threshold and format must be strings');
         }
 
         if (!is_numeric($thresholdRaw)) {
             $output->writeln(sprintf('<error>Invalid threshold "%s": must be a number.</error>', $thresholdRaw));
+            return ExitCode::InvalidInput->value;
+        }
+
+        if (!in_array($format, ['text', 'json'], true)) {
+            $output->writeln(sprintf('<error>Invalid format "%s": must be "text" or "json".</error>', $format));
             return ExitCode::InvalidInput->value;
         }
 
@@ -68,6 +75,12 @@ final class CheckCommand extends Command
         }
 
         $violations = (new CrapAnalyzer())->findViolations($methods, $threshold);
+
+        if ($format === 'json') {
+            $output->writeln($this->encodeJson($threshold, count($methods), $violations));
+            return $violations === [] ? ExitCode::Success->value : ExitCode::ThresholdExceeded->value;
+        }
+
         $thresholdLabel = $this->formatNumber($threshold);
 
         if ($violations === []) {
@@ -110,6 +123,49 @@ final class CheckCommand extends Command
         }
 
         $output->writeln('');
+    }
+
+    /**
+     * @param list<Violation> $violations
+     * @throws JsonException
+     */
+    private function encodeJson(float $threshold, int $totalMethods, array $violations): string
+    {
+        $data = [
+            'threshold' => $threshold,
+            'analyzed' => $totalMethods,
+            'violations' => count($violations),
+            'methods' => array_map(fn (Violation $v): array => $this->violationToArray($v), $violations),
+        ];
+
+        return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function violationToArray(Violation $violation): array
+    {
+        $method = $violation->method;
+        $data = ['name' => $method->name, 'crap' => $method->crap];
+
+        if ($method->className !== null) {
+            $data['class_name'] = $method->className;
+        }
+        if ($method->file !== null) {
+            $data['file'] = $method->file;
+        }
+        if ($method->line !== null) {
+            $data['line'] = $method->line;
+        }
+        if ($method->complexity !== null) {
+            $data['complexity'] = $method->complexity;
+        }
+        if ($method->coverage !== null) {
+            $data['coverage'] = $method->coverage;
+        }
+
+        return $data;
     }
 
     private function formatNumber(float $value): string

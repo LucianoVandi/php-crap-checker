@@ -149,4 +149,52 @@ final class CheckCommandTest extends TestCase
         self::assertSame(0, $this->tester->getStatusCode());
         self::assertStringContainsString('Max allowed: 30', $this->tester->getDisplay());
     }
+
+    public function testJsonFormatWithNoViolationsReturnsExitCode0(): void
+    {
+        $this->tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-valid.xml',
+            '--threshold' => '30',
+            '--format' => 'json',
+        ]);
+
+        self::assertSame(0, $this->tester->getStatusCode());
+        $data = json_decode($this->tester->getDisplay(), true);
+        self::assertIsArray($data);
+        self::assertSame(30.0, $data['threshold']);
+        self::assertSame(0, $data['violations']);
+        self::assertSame([], $data['methods']);
+    }
+
+    public function testJsonFormatWithViolationsReturnsExitCode1(): void
+    {
+        $this->tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-with-violations.xml',
+            '--threshold' => '30',
+            '--format' => 'json',
+        ]);
+
+        self::assertSame(1, $this->tester->getStatusCode());
+        $data = json_decode($this->tester->getDisplay(), true);
+        self::assertIsArray($data);
+        self::assertSame(30.0, $data['threshold']);
+        self::assertSame(3, $data['violations']);
+        self::assertIsArray($data['methods']);
+        self::assertCount(3, $data['methods']);
+        $first = $data['methods'][0];
+        self::assertIsArray($first);
+        self::assertArrayHasKey('name', $first);
+        self::assertArrayHasKey('crap', $first);
+    }
+
+    public function testInvalidFormatReturnsExitCode2(): void
+    {
+        $this->tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-valid.xml',
+            '--format' => 'csv',
+        ]);
+
+        self::assertSame(2, $this->tester->getStatusCode());
+        self::assertStringContainsString('Invalid format', $this->tester->getDisplay());
+    }
 }

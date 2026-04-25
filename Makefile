@@ -1,7 +1,7 @@
 PHP      = docker compose run --rm php
 COMPOSER = docker compose run --rm composer
 
-.PHONY: build install test coverage crap stan cs-check cs-fix phpmd rector infection check-fixture qa shell help
+.PHONY: build install test coverage crap stan cs-check cs-fix phpmd rector infection check-fixture composer-audit composer-unused composer-normalize qa shell help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) \
@@ -23,7 +23,7 @@ crap: coverage ## Run crap-check on the generated coverage report
 	$(PHP) php bin/crap-check check build/crap4j.xml --threshold=30
 
 stan: ## Run PHPStan static analysis (level 9)
-	$(PHP) vendor/bin/phpstan analyse src tests
+	$(PHP) vendor/bin/phpstan analyse src tests --memory-limit=256M
 
 cs-check: ## Check code style (dry-run)
 	$(PHP) vendor/bin/php-cs-fixer fix --dry-run --diff
@@ -42,6 +42,15 @@ infection: ## Run mutation testing with Infection
 
 check-fixture: ## Run crap-check against the violations fixture (expects exit 1)
 	$(PHP) php bin/crap-check check tests/Fixtures/crap4j-with-violations.xml --threshold=30
+
+composer-audit: ## Check dependencies for known security vulnerabilities
+	$(COMPOSER) audit
+
+composer-unused: ## Check for unused Composer dependencies
+	$(PHP) vendor/bin/composer-unused
+
+composer-normalize: ## Check canonical formatting of composer.json (dry-run)
+	$(COMPOSER) normalize --dry-run --diff
 
 qa: test stan ## Run minimum CI gate (test + stan)
 

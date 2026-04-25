@@ -1,42 +1,49 @@
 PHP      = docker compose run --rm php
 COMPOSER = docker compose run --rm composer
 
-.PHONY: build install test coverage crap stan cs-check cs-fix phpmd rector infection check-fixture qa
+.PHONY: build install test coverage crap stan cs-check cs-fix phpmd rector infection check-fixture qa shell help
 
-build:
+help: ## Show this help
+	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) \
+		| awk 'BEGIN {FS = ":.*##"}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+
+build: ## Build Docker image
 	HOST_UID=$(shell id -u) HOST_GID=$(shell id -g) docker compose build
 
-install:
+install: ## Install Composer dependencies
 	$(COMPOSER) install
 
-test:
+test: ## Run PHPUnit test suite
 	$(PHP) vendor/bin/phpunit
 
-coverage:
+coverage: ## Generate Crap4J coverage report
 	$(PHP) php -d pcov.enabled=1 vendor/bin/phpunit --coverage-crap4j build/crap4j.xml
 
-crap: coverage
-	$(PHP) php bin/crap-check build/crap4j.xml --threshold=30
+crap: coverage ## Run crap-check on the generated coverage report
+	$(PHP) php bin/crap-check check build/crap4j.xml --threshold=30
 
-stan:
+stan: ## Run PHPStan static analysis (level 9)
 	$(PHP) vendor/bin/phpstan analyse src tests
 
-cs-check:
+cs-check: ## Check code style (dry-run)
 	$(PHP) vendor/bin/php-cs-fixer fix --dry-run --diff
 
-cs-fix:
+cs-fix: ## Fix code style
 	$(PHP) vendor/bin/php-cs-fixer fix
 
-phpmd:
+phpmd: ## Run PHP Mess Detector
 	$(PHP) vendor/bin/phpmd src/ text .phpmd.xml
 
-rector:
+rector: ## Run Rector (dry-run)
 	$(PHP) vendor/bin/rector process --dry-run
 
-infection:
+infection: ## Run mutation testing with Infection
 	$(PHP) vendor/bin/infection
 
-check-fixture:
-	$(PHP) php bin/crap-check tests/Fixtures/crap4j-with-violations.xml --threshold=30
+check-fixture: ## Run crap-check against the violations fixture (expects exit 1)
+	$(PHP) php bin/crap-check check tests/Fixtures/crap4j-with-violations.xml --threshold=30
 
-qa: test stan
+qa: test stan ## Run minimum CI gate (test + stan)
+
+shell: ## Open a bash shell in the PHP container
+	docker compose run --rm php bash

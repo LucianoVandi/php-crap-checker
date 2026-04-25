@@ -1,7 +1,10 @@
 PHP      = docker compose run --rm php
 COMPOSER = docker compose run --rm composer
 
-.PHONY: install test coverage stan cs-check cs-fix phpmd rector infection check-fixture qa
+.PHONY: build install test coverage stan cs-check cs-fix phpmd rector infection check-fixture qa
+
+build:
+	HOST_UID=$(shell id -u) HOST_GID=$(shell id -g) docker compose build
 
 install:
 	$(COMPOSER) install

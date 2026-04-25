@@ -199,3 +199,22 @@ Mechanically writing tests just to lower the number defeats the purpose. Use the
 - PHP `>=8.3`
 - `ext-simplexml`
 - `symfony/console` `^7.0`
+
+## Development
+
+PHP runs inside Docker. Build the image once (uses your host UID/GID to avoid file permission issues):
+
+```bash
+make build
+make install
+```
+
+Common commands:
+
+```bash
+make test        # PHPUnit
+make qa          # PHPUnit + PHPStan (CI gate)
+make stan        # PHPStan level 9
+make cs-fix      # PHP CS Fixer
+make infection   # Mutation testing
+```

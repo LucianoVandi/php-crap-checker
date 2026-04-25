@@ -136,21 +136,10 @@ final class DoctorCommand extends Command
 
     private function findCrap4jPath(SimpleXMLElement $xml): ?string
     {
-        // PHPUnit 10+ format: <coverage><report><crap4j outputFile="..."/>
         $nodes = $xml->xpath('coverage/report/crap4j/@outputFile');
 
         if (is_array($nodes) && $nodes !== []) {
             $path = (string) $nodes[0];
-            if ($path !== '') {
-                return $path;
-            }
-        }
-
-        // PHPUnit 9 format: <logging><log type="coverage-crap4j" target="..."/>
-        $logs = $xml->xpath('logging/log[@type="coverage-crap4j"]/@target');
-
-        if (is_array($logs) && $logs !== []) {
-            $path = (string) $logs[0];
             if ($path !== '') {
                 return $path;
             }

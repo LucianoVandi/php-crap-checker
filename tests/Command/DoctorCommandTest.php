@@ -177,15 +177,6 @@ final class DoctorCommandTest extends TestCase
         self::assertSame(0, $tester->getStatusCode());
     }
 
-    public function testPhpunit9LoggingFormatSupported(): void
-    {
-        file_put_contents($this->tempDir . '/phpunit.xml', $this->makePhpunit9Xml('build/crap4j.xml'));
-
-        $tester = $this->makeTester($this->tempDir, ['simplexml', 'pcov']);
-        $tester->execute([]);
-
-        self::assertStringContainsString('build/crap4j.xml', $tester->getDisplay());
-    }
 
     private function makePhpunitXml(string $crap4jPath): string
     {
@@ -211,15 +202,5 @@ final class DoctorCommandTest extends TestCase
             XML;
     }
 
-    private function makePhpunit9Xml(string $crap4jPath): string
-    {
-        return <<<XML
-            <?xml version="1.0" encoding="UTF-8"?>
-            <phpunit>
-                <logging>
-                    <log type="coverage-crap4j" target="{$crap4jPath}"/>
-                </logging>
-            </phpunit>
-            XML;
-    }
+
 }

@@ -197,4 +197,189 @@ final class CheckCommandTest extends TestCase
         self::assertSame(2, $this->tester->getStatusCode());
         self::assertStringContainsString('Invalid format', $this->tester->getDisplay());
     }
+
+    // --max-violations tests
+
+    public function testMaxViolationsBelowLimitReturnsExitCode0(): void
+    {
+        $this->tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-with-violations.xml',
+            '--threshold' => '30',
+            '--max-violations' => '5',
+        ]);
+
+        self::assertSame(0, $this->tester->getStatusCode());
+    }
+
+    public function testMaxViolationsExactlyAtLimitReturnsExitCode0(): void
+    {
+        $this->tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-with-violations.xml',
+            '--threshold' => '30',
+            '--max-violations' => '3',
+        ]);
+
+        self::assertSame(0, $this->tester->getStatusCode());
+    }
+
+    public function testMaxViolationsAboveLimitReturnsExitCode1(): void
+    {
+        $this->tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-with-violations.xml',
+            '--threshold' => '30',
+            '--max-violations' => '2',
+        ]);
+
+        self::assertSame(1, $this->tester->getStatusCode());
+    }
+
+    public function testMaxViolationsZeroFailsOnAnyViolation(): void
+    {
+        $this->tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-with-violations.xml',
+            '--threshold' => '30',
+            '--max-violations' => '0',
+        ]);
+
+        self::assertSame(1, $this->tester->getStatusCode());
+    }
+
+    public function testMaxViolationsOutputShowsLimit(): void
+    {
+        $this->tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-with-violations.xml',
+            '--threshold' => '30',
+            '--max-violations' => '5',
+        ]);
+
+        self::assertStringContainsString('limit: 5', $this->tester->getDisplay());
+    }
+
+    public function testMaxViolationsNonNumericReturnsExitCode2(): void
+    {
+        $this->tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-with-violations.xml',
+            '--max-violations' => 'abc',
+        ]);
+
+        self::assertSame(2, $this->tester->getStatusCode());
+    }
+
+    public function testWithoutMaxViolationsBehaviorUnchanged(): void
+    {
+        $this->tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-with-violations.xml',
+            '--threshold' => '30',
+        ]);
+
+        self::assertSame(1, $this->tester->getStatusCode());
+    }
+
+    // --max-age tests
+
+    private function makeTesterWithClock(\Closure $clock): CommandTester
+    {
+        $application = new Application();
+        $application->add(new CheckCommand($clock));
+
+        return new CommandTester($application->find('check'));
+    }
+
+    public function testMaxAgeWithFreshReportPasses(): void
+    {
+        $now = time();
+        $file = $this->fixturesDir . '/crap4j-valid.xml';
+        touch($file, $now - 300); // 5 minutes old
+
+        $tester = $this->makeTesterWithClock(fn() => $now);
+        $tester->execute([
+            'report' => $file,
+            '--max-age' => '60',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+    }
+
+    public function testMaxAgeWithStaleReportReturnsExitCode6(): void
+    {
+        $now = time();
+        $file = $this->fixturesDir . '/crap4j-valid.xml';
+        touch($file, $now - 5400); // 90 minutes old
+
+        $tester = $this->makeTesterWithClock(fn() => $now);
+        $tester->execute([
+            'report' => $file,
+            '--max-age' => '60',
+        ]);
+
+        self::assertSame(6, $tester->getStatusCode());
+    }
+
+    public function testMaxAgeOutputContainsClearMessage(): void
+    {
+        $now = time();
+        $file = $this->fixturesDir . '/crap4j-valid.xml';
+        touch($file, $now - 5400); // 90 minutes old
+
+        $tester = $this->makeTesterWithClock(fn() => $now);
+        $tester->execute([
+            'report' => $file,
+            '--max-age' => '60',
+        ]);
+
+        $output = $tester->getDisplay();
+        self::assertStringContainsString('stale', $output);
+        self::assertStringContainsString('90', $output);
+    }
+
+    public function testMaxAgeHourFormat(): void
+    {
+        $now = time();
+        $file = $this->fixturesDir . '/crap4j-valid.xml';
+        touch($file, $now - 300); // 5 minutes old
+
+        $tester = $this->makeTesterWithClock(fn() => $now);
+        $tester->execute([
+            'report' => $file,
+            '--max-age' => '1h', // 60 minutes
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+    }
+
+    public function testMaxAgeMinuteFormat(): void
+    {
+        $now = time();
+        $file = $this->fixturesDir . '/crap4j-valid.xml';
+        touch($file, $now - 5400); // 90 minutes old
+
+        $tester = $this->makeTesterWithClock(fn() => $now);
+        $tester->execute([
+            'report' => $file,
+            '--max-age' => '30m',
+        ]);
+
+        self::assertSame(6, $tester->getStatusCode());
+    }
+
+    public function testMaxAgeInvalidValueReturnsExitCode2(): void
+    {
+        $this->tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-valid.xml',
+            '--max-age' => 'yesterday',
+        ]);
+
+        self::assertSame(2, $this->tester->getStatusCode());
+    }
+
+    public function testWithoutMaxAgeNoStaleCheck(): void
+    {
+        $now = time();
+        $file = $this->fixturesDir . '/crap4j-valid.xml';
+        touch($file, $now - 99999); // very old
+
+        $this->tester->execute(['report' => $file]);
+
+        self::assertSame(0, $this->tester->getStatusCode());
+    }
 }

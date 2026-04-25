@@ -12,4 +12,5 @@ enum ExitCode: int
     case ReportNotFound = 3;
     case InvalidXml = 4;
     case NoMethodsFound = 5;
+    case StaleReport = 6;
 }

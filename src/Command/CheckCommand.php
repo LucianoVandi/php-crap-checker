@@ -20,6 +20,13 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class CheckCommand extends Command
 {
+    /** @param (\Closure(): int)|null $clock */
+    public function __construct(
+        private readonly ?\Closure $clock = null,
+    ) {
+        parent::__construct();
+    }
+
     protected function configure(): void
     {
         $this
@@ -27,7 +34,9 @@ final class CheckCommand extends Command
             ->setDescription('Check CRAP score against a threshold')
             ->addArgument('report', InputArgument::OPTIONAL, 'Path to Crap4J XML report', 'build/crap4j.xml')
             ->addOption('threshold', null, InputOption::VALUE_REQUIRED, 'Maximum allowed CRAP score', '30')
-            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text|json)', 'text');
+            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text|json)', 'text')
+            ->addOption('max-violations', null, InputOption::VALUE_REQUIRED, 'Maximum number of tolerated violations')
+            ->addOption('max-age', null, InputOption::VALUE_REQUIRED, 'Maximum report age in minutes (e.g. 60, 30m, 2h)');
     }
 
     /**
@@ -39,6 +48,8 @@ final class CheckCommand extends Command
         $reportPath = $input->getArgument('report');
         $thresholdRaw = $input->getOption('threshold');
         $format = $input->getOption('format');
+        $maxViolationsRaw = $input->getOption('max-violations');
+        $maxAgeRaw = $input->getOption('max-age');
 
         if (!is_string($reportPath) || !is_string($thresholdRaw) || !is_string($format)) {
             throw new LogicException('report, threshold and format must be strings');
@@ -54,7 +65,41 @@ final class CheckCommand extends Command
             return ExitCode::InvalidInput->value;
         }
 
+        $maxViolations = null;
+
+        if ($maxViolationsRaw !== null) {
+            if (!is_string($maxViolationsRaw)) {
+                throw new LogicException('max-violations must be a string');
+            }
+            if (!is_numeric($maxViolationsRaw) || (int) $maxViolationsRaw < 0) {
+                $output->writeln(sprintf('<error>Invalid --max-violations "%s": must be a non-negative integer.</error>', $maxViolationsRaw));
+                return ExitCode::InvalidInput->value;
+            }
+            $maxViolations = (int) $maxViolationsRaw;
+        }
+
+        $maxAgeSeconds = null;
+
+        if ($maxAgeRaw !== null) {
+            if (!is_string($maxAgeRaw)) {
+                $output->writeln('<error>Invalid --max-age value.</error>');
+                return ExitCode::InvalidInput->value;
+            }
+            $maxAgeSeconds = $this->parseAge($maxAgeRaw);
+            if ($maxAgeSeconds === null) {
+                $output->writeln(sprintf('<error>Invalid --max-age "%s": use minutes (e.g. 60) or a duration like 30m or 2h.</error>', $maxAgeRaw));
+                return ExitCode::InvalidInput->value;
+            }
+        }
+
         $threshold = (float) $thresholdRaw;
+
+        if ($maxAgeSeconds !== null) {
+            $staleResult = $this->checkAge($reportPath, $maxAgeSeconds, $output);
+            if ($staleResult !== null) {
+                return $staleResult;
+            }
+        }
 
         try {
             $methods = (new Crap4jParser())->parse($reportPath);
@@ -78,7 +123,7 @@ final class CheckCommand extends Command
 
         if ($format === 'json') {
             $output->writeln($this->encodeJson($threshold, count($methods), $violations));
-            return $violations === [] ? ExitCode::Success->value : ExitCode::ThresholdExceeded->value;
+            return $this->resolveExitCode($violations, $maxViolations);
         }
 
         $thresholdLabel = $this->formatNumber($threshold);
@@ -92,14 +137,85 @@ final class CheckCommand extends Command
 
         $output->writeln(sprintf('CRAP threshold exceeded. Max allowed: %s', $thresholdLabel));
         $output->writeln('');
-        $output->writeln(sprintf('%d violation%s found:', count($violations), count($violations) === 1 ? '' : 's'));
+
+        $count = count($violations);
+
+        if ($maxViolations !== null) {
+            $output->writeln(sprintf('%d violation%s found (limit: %d):', $count, $count === 1 ? '' : 's', $maxViolations));
+        } else {
+            $output->writeln(sprintf('%d violation%s found:', $count, $count === 1 ? '' : 's'));
+        }
+
         $output->writeln('');
 
         foreach ($violations as $i => $violation) {
             $this->writeViolation($output, $i + 1, $violation);
         }
 
+        return $this->resolveExitCode($violations, $maxViolations);
+    }
+
+    /**
+     * @param list<Violation> $violations
+     */
+    private function resolveExitCode(array $violations, ?int $maxViolations): int
+    {
+        if ($violations === []) {
+            return ExitCode::Success->value;
+        }
+
+        if ($maxViolations !== null && count($violations) <= $maxViolations) {
+            return ExitCode::Success->value;
+        }
+
         return ExitCode::ThresholdExceeded->value;
+    }
+
+    private function checkAge(string $reportPath, int $maxAgeSeconds, OutputInterface $output): ?int
+    {
+        if (!file_exists($reportPath)) {
+            return null;
+        }
+
+        $mtime = filemtime($reportPath);
+
+        if ($mtime === false) {
+            return null;
+        }
+
+        $now = $this->clock !== null ? ($this->clock)() : time();
+        $ageSeconds = $now - $mtime;
+
+        if ($ageSeconds > $maxAgeSeconds) {
+            $ageMinutes = (int) round($ageSeconds / 60);
+            $maxMinutes = (int) round($maxAgeSeconds / 60);
+            $output->writeln(sprintf(
+                '<error>Report is stale: generated %d minute%s ago (max: %d).</error>',
+                $ageMinutes,
+                $ageMinutes === 1 ? '' : 's',
+                $maxMinutes,
+            ));
+            return ExitCode::StaleReport->value;
+        }
+
+        return null;
+    }
+
+    private function parseAge(string $value): ?int
+    {
+        if (is_numeric($value) && (int) $value > 0) {
+            return (int) $value * 60;
+        }
+
+        if (preg_match('/^(\d+)m$/', $value, $matches)) {
+            return (int) $matches[1] * 60;
+        }
+
+        if (preg_match('/^(\d+)h$/', $value, $matches)) {
+            return (int) $matches[1] * 3600;
+        }
+
+        return null;
     }
 
     private function writeViolation(OutputInterface $output, int $index, Violation $violation): void

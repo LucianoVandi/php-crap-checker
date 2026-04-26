@@ -151,7 +151,7 @@ final class CrapAnalyzerTest extends TestCase
 
         $violations = $this->analyzer->findViolations($methods, 30.0);
 
-        $names = array_map(fn(Violation $v): string => $v->method->name, $violations);
+        $names = array_map(fn (Violation $v): string => $v->method->name, $violations);
         self::assertSame(['highCrapLowComplexity', 'lowCrapHighComplexity'], $names);
     }
 
@@ -167,7 +167,7 @@ final class CrapAnalyzerTest extends TestCase
 
         $violations = $this->analyzer->findViolations($methods, 30.0);
 
-        $names = array_map(fn(Violation $v): string => $v->method->name, $violations);
+        $names = array_map(fn (Violation $v): string => $v->method->name, $violations);
         self::assertSame(['alpha', 'zebra'], $names);
     }
 
@@ -183,7 +183,7 @@ final class CrapAnalyzerTest extends TestCase
 
         $violations = $this->analyzer->findViolations($methods, 30.0);
 
-        $names = array_map(fn(Violation $v): string => $v->method->name, $violations);
+        $names = array_map(fn (Violation $v): string => $v->method->name, $violations);
         self::assertSame(['alpha', 'zebra'], $names);
     }
 }

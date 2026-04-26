@@ -12,7 +12,7 @@
         "ergebnis/composer-normalize": "^2.51",
         "friendsofphp/php-cs-fixer": "^3.0",
         "icanhazstring/composer-unused": "^0.9.6",
-        "infection/infection": "^0.29",
+        "infection/infection": "^0.29 || ^0.32",
         "phpmd/phpmd": "^2.0",
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^11.0 || ^12.0",

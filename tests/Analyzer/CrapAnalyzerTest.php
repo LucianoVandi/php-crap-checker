@@ -139,4 +139,51 @@ final class CrapAnalyzerTest extends TestCase
 
         self::assertSame(42.5, $violations[0]->threshold);
     }
+
+    public function testCrapOrderTakesPriorityOverComplexityOrder(): void
+    {
+        // Kills ReturnRemoval on the crap-comparison branch:
+        // without the return, sorting falls through to complexity and reverses the order.
+        $methods = [
+            new MethodMetric('highCrapLowComplexity', 72.0, complexity: 2),
+            new MethodMetric('lowCrapHighComplexity', 40.0, complexity: 10),
+        ];
+
+        $violations = $this->analyzer->findViolations($methods, 30.0);
+
+        $names = array_map(fn(Violation $v): string => $v->method->name, $violations);
+        self::assertSame(['highCrapLowComplexity', 'lowCrapHighComplexity'], $names);
+    }
+
+    public function testNullComplexityAsLeftEqualsZeroComplexityAsRight(): void
+    {
+        // Kills DecrementInteger (?? 0 → ?? -1) on $complexityLeft.
+        // With ?? -1: complexityLeft=-1 != 0 → complexity-desc puts right first → ['zebra', 'alpha'].
+        // With ?? 0: equal → name-asc → ['alpha', 'zebra'].
+        $methods = [
+            new MethodMetric('alpha', 50.0, complexity: null),
+            new MethodMetric('zebra', 50.0, complexity: 0),
+        ];
+
+        $violations = $this->analyzer->findViolations($methods, 30.0);
+
+        $names = array_map(fn(Violation $v): string => $v->method->name, $violations);
+        self::assertSame(['alpha', 'zebra'], $names);
+    }
+
+    public function testZeroComplexityAsLeftEqualsNullComplexityAsRight(): void
+    {
+        // Kills IncrementInteger (?? 0 → ?? 1) on $complexityRight.
+        // With ?? 1: complexityRight=1 != 0 → complexity-desc puts right first → ['zebra', 'alpha'].
+        // With ?? 0: equal → name-asc → ['alpha', 'zebra'].
+        $methods = [
+            new MethodMetric('alpha', 50.0, complexity: 0),
+            new MethodMetric('zebra', 50.0, complexity: null),
+        ];
+
+        $violations = $this->analyzer->findViolations($methods, 30.0);
+
+        $names = array_map(fn(Violation $v): string => $v->method->name, $violations);
+        self::assertSame(['alpha', 'zebra'], $names);
+    }
 }

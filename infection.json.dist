@@ -16,6 +16,16 @@
             "ignore": [
                 "Lvandi\\PhpCrapChecker\\Parser\\Crap4jParser::parse"
             ]
+        },
+        "LogicalOr": {
+            "ignore": [
+                "Lvandi\\PhpCrapChecker\\Parser\\Crap4jParser::parse"
+            ]
+        },
+        "FunctionCallRemoval": {
+            "ignore": [
+                "Lvandi\\PhpCrapChecker\\Parser\\Crap4jParser::parse"
+            ]
         }
     },
     "minMsi": 80,

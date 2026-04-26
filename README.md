@@ -1,6 +1,18 @@
 # php-crap-checker
 
-A CLI tool to fail CI when PHP CRAP score exceeds a configured threshold.
+[![CI](https://github.com/LucianoVandi/php-crap-checker/actions/workflows/ci.yml/badge.svg)](https://github.com/LucianoVandi/php-crap-checker/actions/workflows/ci.yml)
+[![Latest Stable Version](https://img.shields.io/packagist/v/lvandi/php-crap-checker)](https://packagist.org/packages/lvandi/php-crap-checker)
+[![PHP Version](https://img.shields.io/packagist/php-v/lvandi/php-crap-checker)](https://packagist.org/packages/lvandi/php-crap-checker)
+[![codecov](https://codecov.io/gh/LucianoVandi/php-crap-checker/branch/main/graph/badge.svg)](https://codecov.io/gh/LucianoVandi/php-crap-checker)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+A CI quality gate for method-level change risk in PHP projects.
+
+## Why this tool exists
+
+Complex code with low test coverage is risky to change. The CRAP score captures this pattern in a single number. `crap-check` turns that signal into a CI gate: if any method exceeds the threshold, the build fails.
+
+This matters in any workflow where code can be generated, refactored, or expanded quickly — including AI-assisted development — because static analysis and basic tests can pass while change risk quietly accumulates at method level.
 
 ## What is the CRAP score?
 
@@ -18,6 +30,7 @@ A low CRAP score means the method is either simple, well-tested, or both. A high
 - Compares each method's CRAP score against a configurable threshold
 - Prints the violations sorted by severity
 - Exits with a non-zero code so CI fails when the threshold is exceeded
+- Diagnoses environment and PHPUnit configuration (`doctor` command)
 
 ## What this package does NOT do
 
@@ -52,7 +65,9 @@ The `report` argument defaults to `build/crap4j.xml` and `--threshold` defaults 
 |--------|---------|-------------|
 | `report` | `build/crap4j.xml` | Path to the Crap4J XML report |
 | `--threshold` | `30` | Maximum allowed CRAP score (exclusive) |
-| `--format` | `text` | Output format (`text` only in MVP) |
+| `--max-violations` | _(none)_ | Maximum number of violations before CI fails |
+| `--max-age` | _(none)_ | Maximum report age; accepts minutes (`60`), or duration strings (`30m`, `2h`) |
+| `--format` | `text` | Output format (`text`, `json`) |
 
 ## Usage in GitHub Actions
 
@@ -194,6 +209,19 @@ A high CRAP score on a method is a signal, not a verdict. Before raising the thr
 
 Mechanically writing tests just to lower the number defeats the purpose. Use the score to guide meaningful improvement.
 
+## Adopting on a legacy project
+
+If your codebase already has many violations, a zero-tolerance threshold from day one is counterproductive. See **[docs/ADOPTING.md](docs/ADOPTING.md)** for gradual adoption strategies: start permissive and tighten over time, cap violations with `--max-violations`, and how to talk to your team about the metric.
+
+## Planned
+
+Future releases may add:
+
+- baseline support (snapshot a list of known violations, block only new ones)
+- `--fail-on=new` and `--fail-on=worsened`
+- ignore rules for paths and specific methods
+- GitHub Actions annotations
+
 ## Requirements
 
 - PHP `>=8.3`
@@ -218,3 +246,11 @@ make stan        # PHPStan level 9
 make cs-fix      # PHP CS Fixer
 make infection   # Mutation testing
 ```
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on opening issues and submitting pull requests.
+
+To report a security vulnerability, follow the process described in [SECURITY.md](SECURITY.md).
+
+This project is released under the [MIT License](LICENSE).

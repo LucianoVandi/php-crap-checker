@@ -176,6 +176,35 @@ final class Crap4jParserTest extends TestCase
         }
     }
 
+    public function testFileAndLineAreParsedWhenPresent(): void
+    {
+        $xmlWithFileAndLine = <<<'XML'
+            <?xml version="1.0" encoding="UTF-8"?>
+            <crap_result>
+                <methods>
+                    <method>
+                        <className>App\Foo</className>
+                        <methodName>bar</methodName>
+                        <crap>10.0</crap>
+                        <file>src/Foo.php</file>
+                        <line>42</line>
+                    </method>
+                </methods>
+            </crap_result>
+            XML;
+
+        $tmpFile = sys_get_temp_dir() . '/crap4j-fileline-' . uniqid() . '.xml';
+        file_put_contents($tmpFile, $xmlWithFileAndLine);
+
+        try {
+            $methods = $this->parser->parse($tmpFile);
+            self::assertSame('src/Foo.php', $methods[0]->file);
+            self::assertSame(42, $methods[0]->line);
+        } finally {
+            @unlink($tmpFile);
+        }
+    }
+
     public function testOptionalFieldsAreNullWhenMissing(): void
     {
         $xmlMinimal = <<<'XML'

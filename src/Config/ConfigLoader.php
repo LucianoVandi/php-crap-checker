@@ -10,7 +10,7 @@ use Symfony\Component\Yaml\Yaml;
 
 final class ConfigLoader
 {
-    private const CONFIG_FILE = '.crap-checker.yml';
+    private const string CONFIG_FILE = '.crap-checker.yml';
 
     public function load(string $cwd): Configuration
     {

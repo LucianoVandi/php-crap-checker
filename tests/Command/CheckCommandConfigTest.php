@@ -17,7 +17,7 @@ final class CheckCommandConfigTest extends TestCase
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir() . '/crap-checker-cmd-' . uniqid();
-        mkdir($this->tmpDir, 0755, true);
+        mkdir($this->tmpDir, 0o755, true);
         $this->fixturesDir = __DIR__ . '/../Fixtures';
     }
 
@@ -137,6 +137,107 @@ final class CheckCommandConfigTest extends TestCase
 
         self::assertSame(0, $tester->getStatusCode());
         self::assertStringContainsString('limit: 5', $tester->getDisplay());
+    }
+
+    public function testConfigIgnoreMethodsExcludesMatchingMethod(): void
+    {
+        $this->writeConfig("ignore:\n  methods:\n    - 'App\\Legacy\\ReportGenerator::generate'\n");
+
+        $tester = $this->makeTester();
+        $tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-with-violations.xml',
+            '--threshold' => '30',
+        ]);
+
+        $display = $tester->getDisplay();
+        self::assertStringNotContainsString('ReportGenerator::generate()', $display);
+        self::assertStringContainsString('OrderImporter::import()', $display);
+    }
+
+    public function testConfigIgnorePathsExcludesMatchingFile(): void
+    {
+        $reportPath = $this->tmpDir . '/report.xml';
+        file_put_contents($reportPath, <<<XML
+            <?xml version="1.0" encoding="UTF-8"?>
+            <crap_result>
+                <project/>
+                <methods>
+                    <method>
+                        <className>App\\Service\\Foo</className>
+                        <methodName>bar</methodName>
+                        <crap>50.0</crap>
+                        <file>src/Generated/Foo.php</file>
+                    </method>
+                    <method>
+                        <className>App\\Service\\Baz</className>
+                        <methodName>qux</methodName>
+                        <crap>50.0</crap>
+                        <file>src/Service/Baz.php</file>
+                    </method>
+                </methods>
+            </crap_result>
+            XML);
+
+        $this->writeConfig("ignore:\n  paths:\n    - 'src/Generated/*'\n");
+
+        $tester = $this->makeTester();
+        $tester->execute(['report' => $reportPath, '--threshold' => '30']);
+
+        $display = $tester->getDisplay();
+        self::assertStringNotContainsString('Foo::bar()', $display);
+        self::assertStringContainsString('Baz::qux()', $display);
+    }
+
+    public function testCliIgnoreMethodExcludesMatchingMethod(): void
+    {
+        $tester = $this->makeTester();
+        $tester->execute([
+            'report' => $this->fixturesDir . '/crap4j-with-violations.xml',
+            '--threshold' => '30',
+            '--ignore-method' => ['App\\Legacy\\ReportGenerator::generate'],
+        ]);
+
+        $display = $tester->getDisplay();
+        self::assertStringNotContainsString('ReportGenerator::generate()', $display);
+        self::assertStringContainsString('OrderImporter::import()', $display);
+    }
+
+    public function testCliIgnorePathOverridesConfigIgnorePaths(): void
+    {
+        $reportPath = $this->tmpDir . '/report.xml';
+        file_put_contents($reportPath, <<<XML
+            <?xml version="1.0" encoding="UTF-8"?>
+            <crap_result>
+                <project/>
+                <methods>
+                    <method>
+                        <className>App\\Service\\Foo</className>
+                        <methodName>bar</methodName>
+                        <crap>50.0</crap>
+                        <file>src/Generated/Foo.php</file>
+                    </method>
+                    <method>
+                        <className>App\\Service\\Baz</className>
+                        <methodName>qux</methodName>
+                        <crap>50.0</crap>
+                        <file>src/Other/Baz.php</file>
+                    </method>
+                </methods>
+            </crap_result>
+            XML);
+
+        $this->writeConfig("ignore:\n  paths:\n    - 'src/Generated/*'\n");
+
+        $tester = $this->makeTester();
+        $tester->execute([
+            'report' => $reportPath,
+            '--threshold' => '30',
+            '--ignore-path' => ['src/Other/*'],
+        ]);
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('Foo::bar()', $display);
+        self::assertStringNotContainsString('Baz::qux()', $display);
     }
 
     public function testMalformedConfigReturnsExitCode7(): void

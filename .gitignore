@@ -8,3 +8,4 @@
 *.db
 .beads-credential-key
 *.cache
+.beads/.DS_Store

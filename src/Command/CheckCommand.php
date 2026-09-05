@@ -6,8 +6,9 @@ namespace Lvandi\PhpCrapChecker\Command;
 
 use JsonException;
 use Lvandi\PhpCrapChecker\Analyzer\CrapAnalyzer;
-use Lvandi\PhpCrapChecker\Config\Configuration;
+use Lvandi\PhpCrapChecker\Analyzer\IgnoreFilter;
 use Lvandi\PhpCrapChecker\Config\ConfigLoader;
+use Lvandi\PhpCrapChecker\Config\Configuration;
 use Lvandi\PhpCrapChecker\Console\ExitCode;
 use Lvandi\PhpCrapChecker\Exception\InvalidConfigException;
 use Lvandi\PhpCrapChecker\Exception\InvalidReportException;
@@ -45,7 +46,9 @@ final class CheckCommand extends Command
             ->addOption('threshold', null, InputOption::VALUE_REQUIRED, 'Maximum allowed CRAP score')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text|json)')
             ->addOption('max-violations', null, InputOption::VALUE_REQUIRED, 'Maximum number of tolerated violations')
-            ->addOption('max-age', null, InputOption::VALUE_REQUIRED, 'Maximum report age in minutes (e.g. 60, 30m, 2h)');
+            ->addOption('max-age', null, InputOption::VALUE_REQUIRED, 'Maximum report age in minutes (e.g. 60, 30m, 2h)')
+            ->addOption('ignore-path', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Glob pattern of files to exclude (repeatable)')
+            ->addOption('ignore-method', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Fully-qualified method name to exclude (repeatable)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -82,6 +85,8 @@ final class CheckCommand extends Command
             $output->writeln(sprintf('<error>Invalid XML report: %s</error>', $options->reportPath));
             return ExitCode::InvalidXml->value;
         }
+
+        $methods = (new IgnoreFilter())->filter($methods, $options->ignorePaths, $options->ignoreMethods);
 
         if ($methods === []) {
             $output->writeln('<comment>No methods found in report.</comment>');
@@ -123,13 +128,36 @@ final class CheckCommand extends Command
             return ExitCode::InvalidInput->value;
         }
 
+        $ignorePaths = $this->resolveIgnoreList($input, 'ignore-path', $config->ignorePaths);
+        $ignoreMethods = $this->resolveIgnoreList($input, 'ignore-method', $config->ignoreMethods);
+
         return new ResolvedOptions(
             reportPath: $reportPath,
             threshold: $threshold,
             format: $format,
             maxViolations: $maxViolations,
             maxAgeSeconds: $maxAgeSeconds,
+            ignorePaths: $ignorePaths,
+            ignoreMethods: $ignoreMethods,
         );
+    }
+
+    /**
+     * @param list<string> $configValues
+     * @return list<string>
+     */
+    private function resolveIgnoreList(InputInterface $input, string $option, array $configValues): array
+    {
+        $cliValues = $input->getOption($option);
+
+        assert(is_array($cliValues));
+
+        if ($cliValues === []) {
+            return $configValues;
+        }
+
+        /** @var list<string> $cliValues */
+        return $cliValues;
     }
 
     private function resolveThreshold(InputInterface $input, Configuration $config, OutputInterface $output): float|false

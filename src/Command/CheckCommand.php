@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Lvandi\PhpCrapChecker\Command;
 
 use JsonException;
-use LogicException;
 use Lvandi\PhpCrapChecker\Analyzer\CrapAnalyzer;
+use Lvandi\PhpCrapChecker\Analyzer\IgnoreFilter;
+use Lvandi\PhpCrapChecker\Config\ConfigLoader;
+use Lvandi\PhpCrapChecker\Config\Configuration;
 use Lvandi\PhpCrapChecker\Console\ExitCode;
+use Lvandi\PhpCrapChecker\Exception\InvalidConfigException;
 use Lvandi\PhpCrapChecker\Exception\InvalidReportException;
 use Lvandi\PhpCrapChecker\Exception\ReportNotFoundException;
 use Lvandi\PhpCrapChecker\Parser\Crap4jParser;
@@ -18,12 +21,18 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-/** @SuppressWarnings(PHPMD.ExcessiveClassComplexity) */
+/**
+ * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ */
 final class CheckCommand extends Command
 {
-    /** @param (\Closure(): int)|null $clock */
+    /**
+     * @param (\Closure(): int)|null $clock
+     */
     public function __construct(
         private readonly ?\Closure $clock = null,
+        private readonly ?string $cwd = null,
     ) {
         parent::__construct();
     }
@@ -33,77 +42,39 @@ final class CheckCommand extends Command
         $this
             ->setName('check')
             ->setDescription('Check CRAP score against a threshold')
-            ->addArgument('report', InputArgument::OPTIONAL, 'Path to Crap4J XML report', 'build/crap4j.xml')
-            ->addOption('threshold', null, InputOption::VALUE_REQUIRED, 'Maximum allowed CRAP score', '30')
-            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text|json)', 'text')
+            ->addArgument('report', InputArgument::OPTIONAL, 'Path to Crap4J XML report')
+            ->addOption('threshold', null, InputOption::VALUE_REQUIRED, 'Maximum allowed CRAP score')
+            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text|json)')
             ->addOption('max-violations', null, InputOption::VALUE_REQUIRED, 'Maximum number of tolerated violations')
-            ->addOption('max-age', null, InputOption::VALUE_REQUIRED, 'Maximum report age in minutes (e.g. 60, 30m, 2h)');
+            ->addOption('max-age', null, InputOption::VALUE_REQUIRED, 'Maximum report age in minutes (e.g. 60, 30m, 2h)')
+            ->addOption('ignore-path', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Glob pattern of files to exclude (repeatable)')
+            ->addOption('ignore-method', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Fully-qualified method name to exclude (repeatable)');
     }
 
-    /**
-     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
-     * @SuppressWarnings(PHPMD.NPathComplexity)
-     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $reportPath = $input->getArgument('report');
-        $thresholdRaw = $input->getOption('threshold');
-        $format = $input->getOption('format');
-        $maxViolationsRaw = $input->getOption('max-violations');
-        $maxAgeRaw = $input->getOption('max-age');
-
-        if (!is_string($reportPath) || !is_string($thresholdRaw) || !is_string($format)) {
-            throw new LogicException('report, threshold and format must be strings');
+        try {
+            $config = (new ConfigLoader())->load($this->cwd ?? (string) getcwd());
+        } catch (InvalidConfigException $e) {
+            $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
+            return ExitCode::InvalidConfig->value;
         }
 
-        if (!is_numeric($thresholdRaw)) {
-            $output->writeln(sprintf('<error>Invalid threshold "%s": must be a number.</error>', $thresholdRaw));
-            return ExitCode::InvalidInput->value;
+        $options = $this->resolveOptions($input, $output, $config);
+
+        if (is_int($options)) {
+            return $options;
         }
 
-        if (!in_array($format, ['text', 'json'], true)) {
-            $output->writeln(sprintf('<error>Invalid format "%s": must be "text" or "json".</error>', $format));
-            return ExitCode::InvalidInput->value;
-        }
-
-        $maxViolations = null;
-
-        if ($maxViolationsRaw !== null) {
-            if (!is_string($maxViolationsRaw)) {
-                throw new LogicException('max-violations must be a string');
-            }
-            if (!is_numeric($maxViolationsRaw) || (int) $maxViolationsRaw < 0) {
-                $output->writeln(sprintf('<error>Invalid --max-violations "%s": must be a non-negative integer.</error>', $maxViolationsRaw));
-                return ExitCode::InvalidInput->value;
-            }
-            $maxViolations = (int) $maxViolationsRaw;
-        }
-
-        $maxAgeSeconds = null;
-
-        if ($maxAgeRaw !== null) {
-            if (!is_string($maxAgeRaw)) {
-                $output->writeln('<error>Invalid --max-age value.</error>');
-                return ExitCode::InvalidInput->value;
-            }
-            $maxAgeSeconds = $this->parseAge($maxAgeRaw);
-            if ($maxAgeSeconds === null) {
-                $output->writeln(sprintf('<error>Invalid --max-age "%s": use minutes (e.g. 60) or a duration like 30m or 2h.</error>', $maxAgeRaw));
-                return ExitCode::InvalidInput->value;
-            }
-        }
-
-        $threshold = (float) $thresholdRaw;
-
-        if ($maxAgeSeconds !== null) {
-            $staleResult = $this->checkAge($reportPath, $maxAgeSeconds, $output);
+        if ($options->maxAgeSeconds !== null) {
+            $staleResult = $this->checkAge($options->reportPath, $options->maxAgeSeconds, $output);
             if ($staleResult !== null) {
                 return $staleResult;
             }
         }
 
         try {
-            $methods = (new Crap4jParser())->parse($reportPath);
+            $methods = (new Crap4jParser())->parse($options->reportPath);
         } catch (ReportNotFoundException $e) {
             $output->writeln($e->getMessage());
             $output->writeln('');
@@ -111,23 +82,156 @@ final class CheckCommand extends Command
             $output->writeln('php -d pcov.enabled=1 vendor/bin/phpunit --coverage-crap4j build/crap4j.xml');
             return ExitCode::ReportNotFound->value;
         } catch (InvalidReportException) {
-            $output->writeln(sprintf('<error>Invalid XML report: %s</error>', $reportPath));
+            $output->writeln(sprintf('<error>Invalid XML report: %s</error>', $options->reportPath));
             return ExitCode::InvalidXml->value;
         }
+
+        $methods = (new IgnoreFilter())->filter($methods, $options->ignorePaths, $options->ignoreMethods);
 
         if ($methods === []) {
             $output->writeln('<comment>No methods found in report.</comment>');
             return ExitCode::NoMethodsFound->value;
         }
 
-        $violations = (new CrapAnalyzer())->findViolations($methods, $threshold);
+        $violations = (new CrapAnalyzer())->findViolations($methods, $options->threshold);
 
-        if ($format === 'json') {
-            $output->writeln($this->encodeJson($threshold, count($methods), $violations));
-            return $this->resolveExitCode($violations, $maxViolations);
+        if ($options->format === 'json') {
+            $output->writeln($this->encodeJson($options->threshold, count($methods), $violations));
+            return $this->resolveExitCode($violations, $options->maxViolations);
         }
 
-        return $this->renderTextOutput($output, $violations, $threshold, $maxViolations, count($methods));
+        return $this->renderTextOutput($output, $violations, $options->threshold, $options->maxViolations, count($methods));
+    }
+
+    private function resolveOptions(InputInterface $input, OutputInterface $output, Configuration $config): ResolvedOptions|int
+    {
+        $reportArg = $input->getArgument('report');
+        $reportPath = is_string($reportArg) ? $reportArg : ($config->report ?? 'build/crap4j.xml');
+
+        $threshold = $this->resolveThreshold($input, $config, $output);
+        if ($threshold === false) {
+            return ExitCode::InvalidInput->value;
+        }
+
+        $format = $this->resolveFormat($input, $config, $output);
+        if ($format === false) {
+            return ExitCode::InvalidInput->value;
+        }
+
+        $maxViolations = $this->resolveMaxViolations($input, $config, $output);
+        if ($maxViolations === false) {
+            return ExitCode::InvalidInput->value;
+        }
+
+        $maxAgeSeconds = $this->resolveMaxAge($input, $output);
+        if ($maxAgeSeconds === false) {
+            return ExitCode::InvalidInput->value;
+        }
+
+        $ignorePaths = $this->resolveIgnoreList($input, 'ignore-path', $config->ignorePaths);
+        $ignoreMethods = $this->resolveIgnoreList($input, 'ignore-method', $config->ignoreMethods);
+
+        return new ResolvedOptions(
+            reportPath: $reportPath,
+            threshold: $threshold,
+            format: $format,
+            maxViolations: $maxViolations,
+            maxAgeSeconds: $maxAgeSeconds,
+            ignorePaths: $ignorePaths,
+            ignoreMethods: $ignoreMethods,
+        );
+    }
+
+    /**
+     * @param list<string> $configValues
+     * @return list<string>
+     */
+    private function resolveIgnoreList(InputInterface $input, string $option, array $configValues): array
+    {
+        $cliValues = $input->getOption($option);
+
+        assert(is_array($cliValues));
+
+        if ($cliValues === []) {
+            return $configValues;
+        }
+
+        /** @var list<string> $cliValues */
+        return $cliValues;
+    }
+
+    private function resolveThreshold(InputInterface $input, Configuration $config, OutputInterface $output): float|false
+    {
+        $raw = $input->getOption('threshold');
+        if (!is_string($raw)) {
+            $raw = $config->threshold !== null ? (string) $config->threshold : '30';
+        }
+
+        if (!is_numeric($raw)) {
+            $output->writeln(sprintf('<error>Invalid threshold "%s": must be a number.</error>', $raw));
+            return false;
+        }
+
+        return (float) $raw;
+    }
+
+    private function resolveFormat(InputInterface $input, Configuration $config, OutputInterface $output): string|false
+    {
+        $format = $input->getOption('format');
+        if (!is_string($format)) {
+            $format = $config->format ?? 'text';
+        }
+
+        if (!in_array($format, ['text', 'json'], true)) {
+            $output->writeln(sprintf('<error>Invalid format "%s": must be "text" or "json".</error>', $format));
+            return false;
+        }
+
+        return $format;
+    }
+
+    private function resolveMaxViolations(InputInterface $input, Configuration $config, OutputInterface $output): int|null|false
+    {
+        $raw = $input->getOption('max-violations');
+        if ($raw === null && $config->maxViolations !== null) {
+            $raw = (string) $config->maxViolations;
+        }
+
+        if ($raw === null) {
+            return null;
+        }
+
+        assert(is_string($raw));
+
+        if (!is_numeric($raw) || (int) $raw < 0) {
+            $output->writeln(sprintf('<error>Invalid --max-violations "%s": must be a non-negative integer.</error>', $raw));
+            return false;
+        }
+
+        return (int) $raw;
+    }
+
+    private function resolveMaxAge(InputInterface $input, OutputInterface $output): int|null|false
+    {
+        $raw = $input->getOption('max-age');
+
+        if ($raw === null) {
+            return null;
+        }
+
+        if (!is_string($raw)) {
+            $output->writeln('<error>Invalid --max-age value.</error>');
+            return false;
+        }
+
+        $seconds = $this->parseAge($raw);
+
+        if ($seconds === null) {
+            $output->writeln(sprintf('<error>Invalid --max-age "%s": use minutes (e.g. 60) or a duration like 30m or 2h.</error>', $raw));
+            return false;
+        }
+
+        return $seconds;
     }
 
     /**

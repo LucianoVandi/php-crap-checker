@@ -59,6 +59,8 @@ final class Crap4jParser
         }
 
         $className = (string) $method->className;
+        $file = (string) $method->file;
+        $line = (string) $method->line !== '' ? (int) $method->line : null;
         $complexity = (string) $method->complexity !== '' ? (int) $method->complexity : null;
         $coverage = (string) $method->coverage !== '' ? (float) $method->coverage : null;
 
@@ -66,8 +68,8 @@ final class Crap4jParser
             name: $name,
             crap: (float) $method->crap,
             className: $className !== '' ? $className : null,
-            file: null,
-            line: null,
+            file: $file !== '' ? $file : null,
+            line: $line,
             complexity: $complexity,
             coverage: $coverage,
         );

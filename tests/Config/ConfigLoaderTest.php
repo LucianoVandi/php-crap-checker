@@ -170,6 +170,15 @@ final class ConfigLoaderTest extends TestCase
         self::assertSame(15.5, $config->threshold);
     }
 
+    public function testOversizedConfigFileThrowsInvalidConfigException(): void
+    {
+        $this->writeConfig('.crap-checker.yml', str_repeat('a', 65537));
+
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessageMatches('/exceeds the maximum allowed size/');
+        (new ConfigLoader())->load($this->tmpDir);
+    }
+
     public function testIgnoreSectionWithOnlyPathsLoadsCorrectly(): void
     {
         $this->writeConfig('.crap-checker.yml', "ignore:\n  paths:\n    - \"src/Gen/*\"\n");

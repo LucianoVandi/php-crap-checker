@@ -16,10 +16,6 @@ final class IgnoreFilter
      */
     public function filter(array $methods, array $ignorePaths, array $ignoreMethods): array
     {
-        if ($ignorePaths === [] && $ignoreMethods === []) {
-            return $methods;
-        }
-
         return array_values(array_filter(
             $methods,
             fn (MethodMetric $method): bool => !$this->isIgnored($method, $ignorePaths, $ignoreMethods),
@@ -45,7 +41,7 @@ final class IgnoreFilter
         }
 
         foreach ($ignorePaths as $pattern) {
-            if (fnmatch($pattern, $method->file)) {
+            if (fnmatch($pattern, $method->file, FNM_PATHNAME)) {
                 return true;
             }
         }

@@ -15,4 +15,9 @@ final class InvalidConfigException extends \RuntimeException
     {
         return new self(sprintf('Config file "%s": field "%s" must be %s.', $path, $field, $expected));
     }
+
+    public static function tooLarge(string $path, int $maxBytes): self
+    {
+        return new self(sprintf('Config file "%s" exceeds the maximum allowed size of %d bytes.', $path, $maxBytes));
+    }
 }

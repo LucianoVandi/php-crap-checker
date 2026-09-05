@@ -11,6 +11,7 @@ use Symfony\Component\Yaml\Yaml;
 final class ConfigLoader
 {
     private const string CONFIG_FILE = '.crap-checker.yml';
+    private const int MAX_FILE_SIZE_BYTES = 65536;
 
     public function load(string $cwd): Configuration
     {
@@ -18,6 +19,12 @@ final class ConfigLoader
 
         if (!file_exists($path)) {
             return new Configuration();
+        }
+
+        $size = filesize($path);
+
+        if ($size !== false && $size > self::MAX_FILE_SIZE_BYTES) {
+            throw InvalidConfigException::tooLarge($path, self::MAX_FILE_SIZE_BYTES);
         }
 
         $raw = $this->parseYaml($path);

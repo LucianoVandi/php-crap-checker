@@ -36,7 +36,6 @@ A low CRAP score means the method is either simple, well-tested, or both. A high
 
 - Generate code coverage (that is PHPUnit's job, with PCOV or Xdebug)
 - Replace tools like Codecov for overall coverage tracking
-- Apply per-method or per-path ignores (planned for a future release)
 - Read Clover or other coverage formats
 
 ## Installation
@@ -68,6 +67,26 @@ The `report` argument defaults to `build/crap4j.xml` and `--threshold` defaults 
 | `--max-violations` | _(none)_ | Maximum number of violations before CI fails |
 | `--max-age` | _(none)_ | Maximum report age; accepts minutes (`60`), or duration strings (`30m`, `2h`) |
 | `--format` | `text` | Output format (`text`, `json`) |
+| `--ignore-path` | _(none)_ | Glob pattern of files to exclude; repeatable |
+| `--ignore-method` | _(none)_ | Fully-qualified method name (`Class::method`) to exclude; repeatable |
+
+## Configuration file
+
+Instead of passing options on every invocation, drop a `.crap-checker.yml` file in the project root:
+
+```yaml
+report: build/crap4j.xml
+threshold: 25
+format: text
+max_violations: 5
+ignore:
+  paths:
+    - "src/Generated/*"
+  methods:
+    - "App\\Legacy\\OldImporter::handle"
+```
+
+Any CLI argument or option takes precedence over the corresponding config value. `ignore.paths` and `ignore.methods` are matched independently — a method is excluded if it matches either. `--ignore-path`/`--ignore-method` on the CLI replace (not merge with) the config's ignore lists.
 
 ## Usage in GitHub Actions
 
@@ -137,6 +156,7 @@ Codecov tracks overall and patch coverage. `crap-check` enforces a per-method CR
 | `3` | Report file not found or not readable |
 | `4` | Invalid XML in report |
 | `5` | Report valid but contains no methods |
+| `7` | Invalid or malformed `.crap-checker.yml` |
 
 ## Output examples
 
@@ -219,7 +239,6 @@ Future releases may add:
 
 - baseline support (snapshot a list of known violations, block only new ones)
 - `--fail-on=new` and `--fail-on=worsened`
-- ignore rules for paths and specific methods
 - GitHub Actions annotations
 
 ## Requirements

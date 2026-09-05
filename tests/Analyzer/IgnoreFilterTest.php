@@ -55,6 +55,15 @@ final class IgnoreFilterTest extends TestCase
         self::assertSame([$keep], $result);
     }
 
+    public function testGlobWildcardDoesNotMatchAcrossDirectorySeparators(): void
+    {
+        $method = new MethodMetric('foo', 50.0, file: 'src/Generated/Sub/Foo.php');
+
+        $result = $this->filter->filter([$method], ['src/Generated/*'], []);
+
+        self::assertSame([$method], $result);
+    }
+
     public function testMethodWithoutFileIsNeverMatchedByPathPattern(): void
     {
         $method = new MethodMetric('foo', 50.0);

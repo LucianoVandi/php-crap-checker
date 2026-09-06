@@ -80,7 +80,7 @@ final class CrapAnalyzerTest extends TestCase
     {
         $methods = [
             new MethodMetric('withComplexity', 50.0, complexity: 3),
-            new MethodMetric('noComplexity', 50.0, complexity: null),
+            new MethodMetric('noComplexity', 50.0),
         ];
 
         $violations = $this->analyzer->findViolations($methods, 30.0);
@@ -93,7 +93,7 @@ final class CrapAnalyzerTest extends TestCase
     {
         // Ensures ?? 0 on $complexityLeft is correct: null < positive → comes after
         $methods = [
-            new MethodMetric('nullFirst', 50.0, complexity: null),
+            new MethodMetric('nullFirst', 50.0),
             new MethodMetric('hasComplexity', 50.0, complexity: 1),
         ];
 
@@ -107,8 +107,8 @@ final class CrapAnalyzerTest extends TestCase
     {
         // Ensures ?? 0 on both sides: equal complexity → sort by name asc
         $methods = [
-            new MethodMetric('zebra', 50.0, complexity: null),
-            new MethodMetric('alpha', 50.0, complexity: null),
+            new MethodMetric('zebra', 50.0),
+            new MethodMetric('alpha', 50.0),
         ];
 
         $violations = $this->analyzer->findViolations($methods, 30.0);
@@ -122,7 +122,7 @@ final class CrapAnalyzerTest extends TestCase
         // null ?? 0 and explicit 0 are equal → sort by name
         $methods = [
             new MethodMetric('zebra', 50.0, complexity: 0),
-            new MethodMetric('alpha', 50.0, complexity: null),
+            new MethodMetric('alpha', 50.0),
         ];
 
         $violations = $this->analyzer->findViolations($methods, 30.0);
@@ -161,7 +161,7 @@ final class CrapAnalyzerTest extends TestCase
         // With ?? -1: complexityLeft=-1 != 0 → complexity-desc puts right first → ['zebra', 'alpha'].
         // With ?? 0: equal → name-asc → ['alpha', 'zebra'].
         $methods = [
-            new MethodMetric('alpha', 50.0, complexity: null),
+            new MethodMetric('alpha', 50.0),
             new MethodMetric('zebra', 50.0, complexity: 0),
         ];
 
@@ -178,7 +178,7 @@ final class CrapAnalyzerTest extends TestCase
         // With ?? 0: equal → name-asc → ['alpha', 'zebra'].
         $methods = [
             new MethodMetric('alpha', 50.0, complexity: 0),
-            new MethodMetric('zebra', 50.0, complexity: null),
+            new MethodMetric('zebra', 50.0),
         ];
 
         $violations = $this->analyzer->findViolations($methods, 30.0);
